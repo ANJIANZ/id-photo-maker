@@ -19,6 +19,7 @@
   const smartCropBtn = document.getElementById('smartCropBtn');
   const cropSelectBtn = document.getElementById('cropSelectBtn');
   const cropSelectBtn2 = document.getElementById('cropSelectBtn2');
+  const saveSampleBtn = document.getElementById('saveSampleBtn');
 
   // ===== 状态 =====
   const state = {
@@ -56,6 +57,25 @@
       img.onload = () => {
         state.originalImage = Utils.imageToCanvas(img, 1600);
         cutoutBtn.disabled = false;
+
+        // 应用示例预设（从首页点击示例加载时传入）
+        const presetSizeId = Utils.Storage.get('presetSizeId');
+        const presetBgColor = Utils.Storage.get('presetBgColor');
+        const presetBgName = Utils.Storage.get('presetBgName');
+        if (presetSizeId) {
+          state.sizeId = presetSizeId;
+          Utils.Storage.remove('presetSizeId');
+        }
+        if (presetBgColor) {
+          state.bgColor = presetBgColor;
+          state.bgName = presetBgName || '自定义';
+          Utils.Storage.remove('presetBgColor');
+          Utils.Storage.remove('presetBgName');
+        }
+        // 重新渲染UI
+        renderBgColors();
+        renderSizes();
+        updateInfo();
         render();
       };
       img.src = dataURL;
@@ -184,6 +204,7 @@
     smartCropBtn.addEventListener('click', doSmartCrop);
     cropSelectBtn.addEventListener('click', doCropSelect);
     if (cropSelectBtn2) cropSelectBtn2.addEventListener('click', doCropSelect);
+    saveSampleBtn.addEventListener('click', doSaveSample);
     downloadBtn.addEventListener('click', downloadPhoto);
     toPrintBtn.addEventListener('click', goToPrint);
     reuploadBtn.addEventListener('click', () => {
@@ -486,6 +507,25 @@
     Utils.downloadDataURL(dataURL, filename);
 
     Utils.Storage.set('finalPhoto', exportCanvas.toDataURL('image/png'));
+  }
+
+  // ===== 保存为示例 =====
+  function doSaveSample() {
+    if (!state.finalCanvas) {
+      alert('请先上传照片');
+      return;
+    }
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = previewCanvas.width;
+    exportCanvas.height = previewCanvas.height;
+    exportCanvas.getContext('2d').drawImage(previewCanvas, 0, 0);
+    const dataURL = exportCanvas.toDataURL('image/jpeg', 0.85);
+
+    const name = prompt('示例名称:', `证件照_${getSizeById(state.sizeId).name}_${state.bgName}`);
+    if (!name) return;
+
+    Utils.SampleManager.save(name, dataURL, state.sizeId, state.bgColor, state.bgName);
+    alert('✅ 已保存为示例照片！\n可在首页「示例照片」中查看。');
   }
 
   // ===== 跳转排版页 =====

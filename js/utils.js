@@ -507,6 +507,47 @@ function calcAutoFit(personBox, targetPxW, targetPxH) {
   };
 }
 
+// ===== 示例照片管理器 =====
+const SAMPLE_KEY = 'idphoto_samples';
+
+const SampleManager = {
+  /** 获取所有示例 */
+  getAll() {
+    try {
+      return JSON.parse(localStorage.getItem(SAMPLE_KEY)) || [];
+    } catch { return []; }
+  },
+
+  /** 保存当前照片为示例 */
+  save(name, photoDataURL, sizeId, bgColor, bgName) {
+    const samples = this.getAll();
+    const sample = {
+      id: Date.now(),
+      name: name || `示例 ${samples.length + 1}`,
+      photo: photoDataURL,
+      sizeId: sizeId || 'one',
+      bgColor: bgColor || '#FFFFFF',
+      bgName: bgName || '白色',
+      createdAt: new Date().toLocaleString(),
+    };
+    samples.unshift(sample);
+    if (samples.length > 20) samples.length = 20; // 最多保留 20 个
+    localStorage.setItem(SAMPLE_KEY, JSON.stringify(samples));
+    return sample;
+  },
+
+  /** 删除示例 */
+  remove(id) {
+    const samples = this.getAll().filter(s => s.id !== id);
+    localStorage.setItem(SAMPLE_KEY, JSON.stringify(samples));
+  },
+
+  /** 清空所有 */
+  clear() {
+    localStorage.removeItem(SAMPLE_KEY);
+  },
+};
+
 // 暴露到全局
 window.Utils = {
   loadImageFile,
@@ -527,4 +568,5 @@ window.Utils = {
   calcAutoFit,
   debounce,
   Storage,
+  SampleManager,
 };
