@@ -79,7 +79,8 @@
       };
       img.src = dataURL;
     } else {
-      showEmpty();
+      // 没有上传照片时，自动加载默认示例照片
+      loadDemoImage();
     }
   }
 
@@ -92,6 +93,20 @@
         <p style="margin-top:8px;"><a href="index.html">去上传照片 →</a></p>
       </div>
     `;
+  }
+
+  function loadDemoImage() {
+    const img = new Image();
+    img.onload = () => {
+      state.originalImage = Utils.imageToCanvas(img, 1600);
+      state.bgApplied = true;
+      cutoutBtn.disabled = false;
+      render();
+    };
+    img.onerror = () => {
+      showEmpty();
+    };
+    img.src = 'people_demo.png';
   }
 
   // ===== 渲染背景色选项 =====
