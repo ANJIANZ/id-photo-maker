@@ -42,8 +42,23 @@
     smoothness: 2,
   };
 
+  // 移动端面板折叠：点击标题切换展开/折叠，初始折叠编辑面板
+  function enableMobileCollapse() {
+    const isMobile = window.innerWidth <= 900;
+    document.querySelectorAll('.panel h3').forEach(h3 => {
+      const panel = h3.closest('.panel');
+      if (!panel) return;
+      // 初始状态：移动端编辑面板折叠，信息面板展开
+      if (isMobile && panel.id === 'leftPanel') panel.classList.add('collapsed');
+      h3.addEventListener('click', () => {
+        panel.classList.toggle('collapsed');
+      });
+    });
+  }
+
   // ===== 初始化 =====
   function init() {
+    enableMobileCollapse();
     renderBgColors();
     renderSizes();
     bindControls();
