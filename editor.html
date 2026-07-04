@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>证件照制作 - 编辑器</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">照</span>
+      <span>证件照制作</span>
+    </div>
+    <nav>
+      <a href="index.html">首页</a>
+      <a href="editor.html">编辑器</a>
+      <a href="print.html">排版打印</a>
+    </nav>
+  </header>
+
+  <div class="editor-layout">
+    <!-- 左侧工具栏 -->
+    <div class="panel" id="leftPanel">
+      <h3>🛠️ 编辑工具</h3>
+
+      <div class="panel-section">
+        <span class="label">背景颜色</span>
+        <div class="color-options" id="bgColorOptions"></div>
+        <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+          <input type="color" id="customColor" value="#FFFFFF" style="width:36px;height:36px;border:none;cursor:pointer;border-radius:6px;">
+          <span style="font-size:13px;color:var(--text-light);">自定义颜色</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <span class="label">证件照尺寸</span>
+        <div class="size-options" id="sizeOptions"></div>
+      </div>
+
+      <div class="panel-section">
+        <span class="label">图像调整</span>
+        <div class="slider-row">
+          <div class="slider-label"><span>亮度</span><span id="brightnessVal">0</span></div>
+          <input type="range" id="brightness" min="-50" max="50" value="0">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>对比度</span><span id="contrastVal">0</span></div>
+          <input type="range" id="contrast" min="-50" max="50" value="0">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>饱和度</span><span id="saturateVal">0</span></div>
+          <input type="range" id="saturate" min="-50" max="50" value="0">
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <span class="label">边缘修复</span>
+        <div class="slider-row">
+          <div class="slider-label"><span>边缘羽化</span><span id="featherVal">3</span></div>
+          <input type="range" id="feather" min="0" max="10" value="3">
+        </div>
+        <p style="font-size:11px;color:var(--text-light);margin-top:-6px;">改善头发等边缘锯齿，0=不处理，越高越柔和</p>
+      </div>
+
+      <div class="panel-section">
+        <span class="label">旋转翻转</span>
+        <div class="tool-group">
+          <button class="tool-btn" id="rotateLeftBtn">↺ 左转90°</button>
+          <button class="tool-btn" id="rotateRightBtn">↻ 右转90°</button>
+          <button class="tool-btn" id="flipHBtn">⇄ 水平翻转</button>
+        </div>
+      </div>
+
+      <div class="panel-section" id="manualCutoutSection" style="display:none;">
+        <span class="label" style="color:var(--danger);">✂️ 手动抠图（备选方案）</span>
+        <p style="font-size:12px;color:var(--text-light);margin-bottom:8px;">点击预览图中背景区域吸取颜色，然后拖动滑块微调</p>
+        <div class="tool-group" style="margin-bottom:8px;">
+          <button class="tool-btn" id="pickColorBtn" style="border-color:var(--danger);color:var(--danger);">🎯 吸取背景色</button>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>容差</span><span id="toleranceVal">60</span></div>
+          <input type="range" id="tolerance" min="5" max="150" value="60">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>边缘羽化</span><span id="smoothnessVal">2</span></div>
+          <input type="range" id="smoothness" min="0" max="5" value="2">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <span style="font-size:12px;color:var(--text-light);">已吸取颜色：</span>
+          <span id="pickedColorDisplay" style="width:24px;height:24px;border-radius:4px;border:1px solid var(--border);display:inline-block;background:#ccc;"></span>
+        </div>
+        <button class="btn btn-danger" id="manualCutoutBtn" style="width:100%;margin-top:8px;font-size:13px;">✂️ 执行手动抠图</button>
+      </div>
+
+      <div class="panel-section">
+        <span class="label">裁剪位置微调</span>
+        <div class="slider-row">
+          <div class="slider-label"><span>水平偏移</span><span id="offsetXVal">50%</span></div>
+          <input type="range" id="offsetX" min="0" max="100" value="50">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>垂直偏移</span><span id="offsetYVal">40%</span></div>
+          <input type="range" id="offsetY" min="0" max="100" value="40">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>缩放</span><span id="scaleVal">100%</span></div>
+          <input type="range" id="scale" min="50" max="200" value="100">
+        </div>
+      </div>
+    </div>
+
+    <!-- 中间画布区 -->
+    <div class="canvas-area">
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <canvas id="previewCanvas"></canvas>
+        <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+          <div class="spinner"></div>
+          <p id="loadingText">正在加载 AI 抠图模型...</p>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <button class="btn btn-outline" id="reuploadBtn">重新上传</button>
+        <button class="btn btn-primary" id="cutoutBtn" disabled>🤖 AI 抠图</button>
+        <button class="btn btn-success" id="toPrintBtn">🖨️ 排版打印 →</button>
+        <button class="btn btn-primary" id="downloadBtn">⬇️ 下载证件照</button>
+      </div>
+    </div>
+
+    <!-- 右侧信息面板 -->
+    <div class="panel">
+      <h3>📋 信息</h3>
+      <div class="info-item">
+        <span class="info-label">当前尺寸</span>
+        <span class="info-value" id="infoSize">一寸</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">物理尺寸</span>
+        <span class="info-value" id="infoDim">25×35mm</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">像素尺寸</span>
+        <span class="info-value" id="infoPx">295×413px</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">分辨率</span>
+        <span class="info-value">300 DPI</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">背景颜色</span>
+        <span class="info-value" id="infoBg">白色</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">抠图状态</span>
+        <span class="info-value" id="infoCutout">未抠图</span>
+      </div>
+
+      <div style="margin-top:20px; padding:12px; background:#fef3c7; border-radius:6px; font-size:12px; color:#92400e; line-height:1.5;">
+        💡 提示：上传照片后点击"AI 抠图"自动抠图。如果网络受限，AI 失败后左侧会出现"手动抠图"备选方案（点击预览图吸取背景色）。
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sizes.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/background-removal.js"></script>
+  <script src="js/editor.js"></script>
+</body>
+</html>

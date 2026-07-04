@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>证件照制作 - 排版打印</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">照</span>
+      <span>证件照制作</span>
+    </div>
+    <nav>
+      <a href="index.html">首页</a>
+      <a href="editor.html">编辑器</a>
+      <a href="print.html">排版打印</a>
+    </nav>
+  </header>
+
+  <div class="print-layout">
+    <h2 class="section-title">🖨️ 排版打印</h2>
+    <p class="section-subtitle">将证件照自动排列到打印纸张上</p>
+
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <div class="empty-icon">🖨️</div>
+      <p>还没有证件照</p>
+      <p style="margin-top:8px;"><a href="editor.html">去制作证件照 →</a></p>
+    </div>
+
+    <div id="printContent" style="display:none;">
+      <!-- 纸张选择 -->
+      <div class="print-paper-select" id="paperSelect"></div>
+
+      <!-- 排版信息 -->
+      <div class="print-info">
+        <div class="info-box">
+          <div class="num" id="photoCount">0</div>
+          <div class="desc">每页可排张数</div>
+        </div>
+        <div class="info-box">
+          <div class="num" id="photoSize">一寸</div>
+          <div class="desc">证件照尺寸</div>
+        </div>
+        <div class="info-box">
+          <div class="num" id="paperName">A4</div>
+          <div class="desc">纸张类型</div>
+        </div>
+      </div>
+
+      <!-- 预览 -->
+      <div class="print-preview">
+        <canvas id="printCanvas"></canvas>
+      </div>
+
+      <!-- 操作 -->
+      <div class="bottom-bar">
+        <button class="btn btn-outline" onclick="window.location.href='editor.html'">← 返回编辑</button>
+        <button class="btn btn-primary" id="downloadPrintBtn">⬇️ 下载排版图</button>
+        <button class="btn btn-outline" onclick="window.print()">🖨️ 直接打印</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sizes.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/print.js"></script>
+</body>
+</html>

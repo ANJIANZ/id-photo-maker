@@ -1,0 +1,44 @@
+# Render 部署配置
+# 部署方式一：Web Service（运行 Node.js 服务器，推荐）
+# 部署方式二：Static Site（纯静态，忽略这部分的 buildCommand 即可）
+#
+# 使用方式：
+# 1. 将此项目推送到 GitHub
+# 2. 在 Render 控制台 -> New -> Web Service 或 Static Site
+# 3. 连接你的 GitHub 仓库
+# 4. Render 会自动读取此文件
+
+services:
+  # ========== Web Service（推荐，支持完整功能） ==========
+  - type: web
+    name: id-photo-maker
+    runtime: node
+    repo: https://github.com/你的用户名/你的仓库名
+    plan: free
+    region: singapore  # 亚洲用户推荐新加坡节点
+    buildCommand: ""   # 无需构建
+    startCommand: node server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+
+  # ========== Static Site（纯静态页面，无需服务器） ==========
+  # 取消注释以下部分即可启用
+  # - type: static_site
+  #   name: id-photo-maker-static
+  #   repo: https://github.com/你的用户名/你的仓库名
+  #   plan: free
+  #   region: singapore
+  #   buildCommand: ""  # 纯静态，无需构建
+  #   staticPublishPath: .  # 当前目录即发布目录
+  #   headers:
+  #     - path: /*
+  #       name: Cross-Origin-Opener-Policy
+  #       value: same-origin
+  #     - path: /*
+  #       name: Cross-Origin-Embedder-Policy
+  #       value: credentialless
+  #     - path: /*
+  #       name: Access-Control-Allow-Origin
+  #       value: "*"

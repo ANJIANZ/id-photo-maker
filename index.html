@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>证件照制作 - 首页</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">照</span>
+      <span>证件照制作</span>
+    </div>
+    <nav>
+      <a href="index.html">首页</a>
+      <a href="editor.html">编辑器</a>
+      <a href="print.html">排版打印</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="hero">
+      <h1>免费在线证件照制作</h1>
+      <p>AI 智能抠图 · 一键换底色 · 多种标准尺寸 · 排版打印，所有处理在浏览器本地完成，保护您的隐私</p>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">📁</div>
+      <h3>点击上传或拖拽照片到这里</h3>
+      <p>支持 JPG、PNG、WebP 格式，建议上传清晰正面照片</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-outline" id="cameraBtn">📷 摄像头拍照</button>
+      <button class="btn btn-primary" id="startEditorBtn">前往编辑器 →</button>
+    </div>
+
+    <!-- 特性介绍 -->
+    <h2 class="section-title">核心功能</h2>
+    <p class="section-subtitle">一站式证件照制作工具</p>
+    <div class="features">
+      <div class="feature-item">
+        <div class="feat-icon">🤖</div>
+        <h4>AI 智能抠图</h4>
+        <p>浏览器端 AI 模型自动识别人物，精准移除背景</p>
+      </div>
+      <div class="feature-item">
+        <div class="feat-icon">🎨</div>
+        <h4>一键换底色</h4>
+        <p>白色、蓝色、红色等多种标准底色，支持自定义</p>
+      </div>
+      <div class="feature-item">
+        <div class="feat-icon">📐</div>
+        <h4>标准尺寸</h4>
+        <p>一寸、二寸等中国标准证件照尺寸，精准裁剪</p>
+      </div>
+      <div class="feature-item">
+        <div class="feat-icon">🖨️</div>
+        <h4>排版打印</h4>
+        <p>自动排版到 4×6、5×7、A4 纸张，直接打印</p>
+      </div>
+      <div class="feature-item">
+        <div class="feat-icon">🔒</div>
+        <h4>隐私安全</h4>
+        <p>所有处理在本地完成，照片不上传服务器</p>
+      </div>
+      <div class="feature-item">
+        <div class="feat-icon">⚡</div>
+        <h4>高清输出</h4>
+        <p>300dpi 高分辨率输出，满足打印需求</p>
+      </div>
+    </div>
+
+    <!-- 支持尺寸 -->
+    <h2 class="section-title">支持的证件照尺寸</h2>
+    <p class="section-subtitle">覆盖常用中国标准证件照规格</p>
+    <div class="size-grid" id="sizeGrid"></div>
+  </div>
+
+  <!-- 摄像头模态框 -->
+  <div class="modal" id="cameraModal">
+    <div class="modal-content">
+      <h3>📷 摄像头拍照</h3>
+      <video id="cameraVideo" autoplay playsinline></video>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="closeCameraBtn">取消</button>
+        <button class="btn btn-primary" id="captureBtn">拍照</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sizes.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/upload.js"></script>
+  <script>
+    // 渲染尺寸卡片
+    const sizeGrid = document.getElementById('sizeGrid');
+    ID_SIZES.forEach(s => {
+      const pxW = mmToPixel(s.width);
+      const pxH = mmToPixel(s.height);
+      const ratio = pxW / pxH;
+      const w = ratio > 0.8 ? 60 : 50;
+      const h = Math.round(w / ratio);
+      const card = document.createElement('div');
+      card.className = 'size-card';
+      card.innerHTML = `
+        <div class="size-preview" style="width:${w}px;height:${h}px;">${s.name}</div>
+        <h4>${s.name}</h4>
+        <div class="size-dim">${s.width}×${s.height}mm<br>${pxW}×${pxH}px</div>
+      `;
+      sizeGrid.appendChild(card);
+    });
+  </script>
+</body>
+</html>
