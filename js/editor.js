@@ -69,8 +69,13 @@
     bindControls();
     bindManualCutout();
 
+    // 检查是否从首页"试用示例照片"跳转过来
+    const urlParams = new URLSearchParams(window.location.search);
+    const isDemo = urlParams.get('demo') === '1';
+
     const dataURL = Utils.Storage.get('originalImage');
     if (dataURL) {
+      // 有上传的照片
       const img = new Image();
       img.onload = () => {
         state.originalImage = Utils.imageToCanvas(img, 1600);
@@ -78,6 +83,9 @@
         render();
       };
       img.src = dataURL;
+    } else if (isDemo) {
+      // 来自首页"试用示例照片"按钮 - 使用内嵌 base64（兼容所有协议）
+      useEmbeddedDemoImage();
     } else {
       // 没有上传照片时，自动加载默认示例照片
       loadDemoImage();
@@ -107,6 +115,25 @@
       showEmpty();
     };
     img.src = 'people_demo.png';
+  }
+
+  // 使用内嵌 base64 数据加载示例照片（兼容 file:// 协议，无 Canvas 污染问题）
+  function useEmbeddedDemoImage() {
+    if (typeof DEMO_IMAGE_DATA_URL === 'undefined') {
+      showEmpty();
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      state.originalImage = Utils.imageToCanvas(img, 1600);
+      state.bgApplied = true;
+      cutoutBtn.disabled = false;
+      render();
+    };
+    img.onerror = () => {
+      showEmpty();
+    };
+    img.src = DEMO_IMAGE_DATA_URL;
   }
 
   // ===== 渲染背景色选项 =====
