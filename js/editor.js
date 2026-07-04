@@ -18,6 +18,7 @@
   const manualCutoutBtn = document.getElementById('manualCutoutBtn');
   const smartCropBtn = document.getElementById('smartCropBtn');
   const cropSelectBtn2 = document.getElementById('cropSelectBtn2');
+  const resetOriginalBtn = document.getElementById('resetOriginalBtn');
 
   // ===== 状态 =====
   const state = {
@@ -25,6 +26,7 @@
     cutoutImage: null,
     bgColor: '#FFFFFF',
     bgName: '白色',
+    bgApplied: false,
     sizeId: 'one',
     rotation: 0,
     flipH: false,
@@ -98,7 +100,7 @@
     container.innerHTML = '';
     BG_COLORS.forEach((c, i) => {
       const div = document.createElement('div');
-      div.className = 'color-option' + (i === 0 ? ' active' : '');
+      div.className = 'color-option';
       div.style.background = c.color;
       div.title = c.name;
       div.innerHTML = '<span class="check">✓</span>';
@@ -107,12 +109,9 @@
         div.classList.add('active');
         state.bgColor = c.color;
         state.bgName = c.name;
+        state.bgApplied = true;
         document.getElementById('infoBg').textContent = c.name;
-        if (!state.hasCutout && state.originalImage) {
-          autoCutoutByBgColor();
-        } else {
-          render();
-        }
+        render();
       });
       container.appendChild(div);
     });
@@ -121,13 +120,10 @@
   document.getElementById('customColor').addEventListener('input', (e) => {
     state.bgColor = e.target.value;
     state.bgName = '自定义';
+    state.bgApplied = true;
     document.querySelectorAll('.color-option').forEach(el => el.classList.remove('active'));
     document.getElementById('infoBg').textContent = '自定义';
-    if (!state.hasCutout && state.originalImage) {
-      autoCutoutByBgColor();
-    } else {
-      render();
-    }
+    render();
   });
 
   // ===== 渲染尺寸选项 =====
@@ -162,12 +158,79 @@
     document.getElementById('infoPx').textContent = `${pxW}×${pxH}px`;
   }
 
+  const DEFAULTS = {
+    bgColor: '#FFFFFF',
+    bgName: '白色',
+    sizeId: 'one',
+    rotation: 0,
+    flipH: false,
+    brightness: 0,
+    contrast: 0,
+    saturate: 0,
+    offsetX: 0.5,
+    offsetY: 0.4,
+    scale: 1.0,
+    feather: 3,
+    smooth: 0,
+    whiten: 0,
+    sharpen: 0,
+    hasCutout: false,
+    pickingColor: false,
+    pickedColor: { r: 200, g: 200, b: 200 },
+    tolerance: 60,
+    smoothness: 2,
+  };
+
+  function resetToOriginal() {
+    if (!state.originalImage) return;
+
+    state.cutoutImage = null;
+    Object.assign(state, DEFAULTS);
+    state.bgApplied = false;
+    state.finalCanvas = null;
+
+    updateInfo();
+    renderBgColors();
+    renderSizes();
+
+    document.getElementById('brightness').value = 0;
+    document.getElementById('brightnessVal').textContent = '0';
+    document.getElementById('contrast').value = 0;
+    document.getElementById('contrastVal').textContent = '0';
+    document.getElementById('saturate').value = 0;
+    document.getElementById('saturateVal').textContent = '0';
+    document.getElementById('feather').value = 3;
+    document.getElementById('featherVal').textContent = '3';
+    document.getElementById('smooth').value = 0;
+    document.getElementById('smoothVal').textContent = '0';
+    document.getElementById('whiten').value = 0;
+    document.getElementById('whitenVal').textContent = '0';
+    document.getElementById('sharpen').value = 0;
+    document.getElementById('sharpenVal').textContent = '0';
+    document.getElementById('offsetX').value = 50;
+    document.getElementById('offsetXVal').textContent = '50%';
+    document.getElementById('offsetY').value = 40;
+    document.getElementById('offsetYVal').textContent = '40%';
+    document.getElementById('scale').value = 100;
+    document.getElementById('scaleVal').textContent = '100%';
+
+    document.getElementById('infoCutout').textContent = '未抠图';
+    document.getElementById('pickedColorDisplay').style.background = `rgb(${state.pickedColor.r},${state.pickedColor.g},${state.pickedColor.b})`;
+    manualSection.style.display = 'none';
+    pickColorBtn.textContent = '🎯 吸取背景色';
+    pickColorBtn.style.borderColor = 'var(--danger)';
+    previewCanvas.style.cursor = 'default';
+
+    render();
+  }
+
   // ===== 绑定控件 =====
   function bindControls() {
     const sliders = [
       { id: 'brightness', valId: 'brightnessVal', key: 'brightness', fmt: v => v },
       { id: 'contrast', valId: 'contrastVal', key: 'contrast', fmt: v => v },
       { id: 'saturate', valId: 'saturateVal', key: 'saturate', fmt: v => v },
+      { id: 'feather', valId: 'featherVal', key: 'feather', fmt: v => v },
       { id: 'smooth', valId: 'smoothVal', key: 'smooth', fmt: v => v },
       { id: 'whiten', valId: 'whitenVal', key: 'whiten', fmt: v => v },
       { id: 'sharpen', valId: 'sharpenVal', key: 'sharpen', fmt: v => v },
@@ -208,6 +271,12 @@
     reuploadBtn.addEventListener('click', () => {
       window.location.href = 'index.html';
     });
+
+    if (resetOriginalBtn) {
+      resetOriginalBtn.addEventListener('click', () => {
+        resetToOriginal();
+      });
+    }
   }
 
   // ===== 手动抠图绑定 =====
@@ -297,8 +366,41 @@
       document.querySelector('.color-option:first-child')?.classList.remove('active');
     } catch (e) {
       console.warn('自动抠图失败', e);
+      alert('自动抠图失败，已保留原图。\n\n你可以尝试：\n1. 重新选择背景更统一的上传图\n2. 使用左侧“手动抠图”吸取背景色后再抠图\n\n错误：' + e.message);
     }
     doAutoFit();
+  }
+
+  // ===== 临时自动抠图（不改变全局状态，仅用于渲染预览） =====
+  function tryAutoCutoutForRender() {
+    const canvas = state.originalImage;
+    const w = canvas.width, h = canvas.height;
+
+    const samples = [];
+    const step = 10;
+    const corners = [
+      { x: 5, y: 5 }, { x: w - 5, y: 5 },
+      { x: 5, y: h - 5 }, { x: w - 5, y: h - 5 },
+    ];
+    corners.forEach(p => samples.push(Utils.pickColor(canvas, p.x, p.y)));
+    for (let x = 0; x < w; x += step) samples.push(Utils.pickColor(canvas, x, 3));
+    for (let x = 0; x < w; x += step) samples.push(Utils.pickColor(canvas, x, h - 3));
+    for (let y = 0; y < h; y += step) samples.push(Utils.pickColor(canvas, 3, y));
+    for (let y = 0; y < h; y += step) samples.push(Utils.pickColor(canvas, w - 3, y));
+
+    const colorCounts = {};
+    samples.forEach(c => {
+      const key = `${Math.round(c.r / 20) * 20},${Math.round(c.g / 20) * 20},${Math.round(c.b / 20) * 20}`;
+      colorCounts[key] = (colorCounts[key] || 0) + 1;
+    });
+    const dominantKey = Object.entries(colorCounts).sort((a, b) => b[1] - a[1])[0][0];
+    const [dr, dg, db] = dominantKey.split(',').map(Number);
+
+    try {
+      return Utils.removeColorBackground(canvas, { r: dr, g: dg, b: db }, 50, 3);
+    } catch (e) {
+      return null;
+    }
   }
 
   // ===== AI 抠图 =====
@@ -444,6 +546,11 @@
 
     let source = state.hasCutout ? state.cutoutImage : state.originalImage;
 
+    if (!state.hasCutout && state.originalImage) {
+      const tempCutout = tryAutoCutoutForRender();
+      if (tempCutout) source = tempCutout;
+    }
+
     if (state.rotation !== 0) {
       source = Utils.rotateCanvas(source, state.rotation);
     }
@@ -481,12 +588,19 @@
       });
     }
 
+    if (state.hasCutout && state.feather > 0) {
+      source = Utils.refineAlphaEdge(source, state.feather);
+    }
+
     previewCanvas.width = pxW;
     previewCanvas.height = pxH;
 
-    // 始终用选中背景色填充
-    ctx.fillStyle = state.bgColor;
-    ctx.fillRect(0, 0, pxW, pxH);
+    if (state.bgApplied) {
+      ctx.fillStyle = state.bgColor;
+      ctx.fillRect(0, 0, pxW, pxH);
+    } else {
+      ctx.clearRect(0, 0, pxW, pxH);
+    }
 
     const srcW = source.width;
     const srcH = source.height;
