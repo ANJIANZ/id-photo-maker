@@ -37,13 +37,6 @@
     <button class="btn btn-primary" id="startEditorBtn">前往编辑器 →</button>
   </div>
 
-  <!-- 示例照片 -->
-  <div id="sampleSection" style="display:none; margin-top:40px;">
-    <h2 class="section-title">📂 示例照片</h2>
-    <p class="section-subtitle">点击示例快速加载到编辑器</p>
-    <div class="size-grid" id="sampleGrid"></div>
-  </div>
-
   <!-- 特性介绍 -->
     <h2 class="section-title">核心功能</h2>
     <p class="section-subtitle">一站式证件照制作工具</p>
@@ -119,44 +112,6 @@
       `;
       sizeGrid.appendChild(card);
     });
-
-    // ===== 示例照片图库 =====
-    function renderSamples() {
-      const samples = Utils.SampleManager.getAll();
-      const section = document.getElementById('sampleSection');
-      const grid = document.getElementById('sampleGrid');
-      grid.innerHTML = '';
-      if (samples.length === 0) { section.style.display = 'none'; return; }
-      section.style.display = 'block';
-      samples.forEach(s => {
-        const card = document.createElement('div');
-        card.className = 'size-card';
-        card.style.cursor = 'pointer';
-        card.innerHTML = `
-          <img src="${s.photo}" style="width:100%;aspect-ratio:${s.photo.includes('width')?'auto':''};border-radius:4px;object-fit:cover;max-height:120px;">
-          <h4 style="margin-top:8px;font-size:13px;">${s.name}</h4>
-          <div class="size-dim" style="font-size:11px;">${s.bgName}背景 · ${getSizeById(s.sizeId).name}</div>
-          <div style="margin-top:6px;font-size:10px;color:#94a3b8;">${s.createdAt}</div>
-        `;
-        card.addEventListener('click', () => {
-          Utils.Storage.set('originalImage', s.photo);
-          Utils.Storage.set('presetSizeId', s.sizeId);
-          Utils.Storage.set('presetBgColor', s.bgColor);
-          Utils.Storage.set('presetBgName', s.bgName);
-          window.location.href = 'editor.html';
-        });
-        // 右键删除
-        card.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
-          if (confirm(`删除示例「${s.name}」？`)) {
-            Utils.SampleManager.remove(s.id);
-            renderSamples();
-          }
-        });
-        grid.appendChild(card);
-      });
-    }
-    renderSamples();
   </script>
 </body>
 </html>
