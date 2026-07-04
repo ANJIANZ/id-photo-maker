@@ -18,6 +18,7 @@
   const manualCutoutBtn = document.getElementById('manualCutoutBtn');
   const smartCropBtn = document.getElementById('smartCropBtn');
   const cropSelectBtn = document.getElementById('cropSelectBtn');
+  const cropSelectBtn2 = document.getElementById('cropSelectBtn2');
 
   // ===== 状态 =====
   const state = {
@@ -182,6 +183,7 @@
     cutoutBtn.addEventListener('click', doCutout);
     smartCropBtn.addEventListener('click', doSmartCrop);
     cropSelectBtn.addEventListener('click', doCropSelect);
+    if (cropSelectBtn2) cropSelectBtn2.addEventListener('click', doCropSelect);
     downloadBtn.addEventListener('click', downloadPhoto);
     toPrintBtn.addEventListener('click', goToPrint);
     reuploadBtn.addEventListener('click', () => {

@@ -168,9 +168,12 @@ const CropSelector = {
 
   _getCanvasPos(e) {
     const rect = this._leftCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left);
-    const y = (e.clientY - rect.top);
-    if (x < 0 || x > rect.width || y < 0 || y > rect.height) return null;
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+    if (cssX < 0 || cssX > rect.width || cssY < 0 || cssY > rect.height) return null;
+    // 将 CSS 坐标映射到 Canvas 属性坐标（处理 CSS 缩放）
+    const x = cssX * (this._leftCanvas.width / rect.width);
+    const y = cssY * (this._leftCanvas.height / rect.height);
     return { x, y };
   },
 
