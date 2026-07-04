@@ -7,11 +7,13 @@
 const CropSelector = {
   _sourceCanvas: null,
   _targetRatio: 1,
-  _sel: null,          // { cx, cy, halfW, halfH } 在原图坐标系下
-  _displayScale: 1,    // 原图到显示画布的缩放
+  _sel: null,
+  _displayScale: 1,
   _isDragging: false,
   _dragStart: null,
   _lastCenter: null,
+  _pinchStartDist: null,
+  _pinchStartHalfW: null,
   _onConfirm: null,
 
   // DOM 元素（由 open 时传入）
@@ -88,22 +90,31 @@ const CropSelector = {
     this._onMouseUp = this._onMouseUp.bind(this);
     this._onWheel = this._onWheel.bind(this);
     this._onKeyDown = this._onKeyDown.bind(this);
+    this._onTouchStart = this._onTouchStart.bind(this);
+    this._onTouchMove = this._onTouchMove.bind(this);
+    this._onTouchEnd = this._onTouchEnd.bind(this);
 
     this._leftCanvas.addEventListener('mousedown', this._onMouseDown);
     window.addEventListener('mousemove', this._onMouseMove);
     window.addEventListener('mouseup', this._onMouseUp);
     this._leftCanvas.addEventListener('wheel', this._onWheel, { passive: false });
     window.addEventListener('keydown', this._onKeyDown);
+    this._leftCanvas.addEventListener('touchstart', this._onTouchStart, { passive: false });
+    window.addEventListener('touchmove', this._onTouchMove, { passive: false });
+    window.addEventListener('touchend', this._onTouchEnd);
   },
 
   _unbindEvents() {
     if (this._leftCanvas) {
       this._leftCanvas.removeEventListener('mousedown', this._onMouseDown);
       this._leftCanvas.removeEventListener('wheel', this._onWheel);
+      this._leftCanvas.removeEventListener('touchstart', this._onTouchStart);
     }
     window.removeEventListener('mousemove', this._onMouseMove);
     window.removeEventListener('mouseup', this._onMouseUp);
     window.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('touchmove', this._onTouchMove);
+    window.removeEventListener('touchend', this._onTouchEnd);
   },
 
   _onMouseDown(e) {
@@ -161,9 +172,85 @@ const CropSelector = {
     this._render();
   },
 
+  _onTouchStart(e) {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const pos = this._getTouchPos(e.touches[0]);
+      if (!pos) return;
+      this._isDragging = true;
+      this._dragStart = { x: pos.x, y: pos.y };
+      this._lastCenter = { cx: this._sel.cx, cy: this._sel.cy };
+    } else if (e.touches.length === 2) {
+      this._pinchStartDist = this._getTouchDist(e.touches);
+      this._pinchStartHalfW = this._sel.halfW;
+    }
+  },
+
+  _onTouchMove(e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && this._isDragging) {
+      const pos = this._getTouchPos(e.touches[0]);
+      if (!pos) return;
+      const dx = (pos.x - this._dragStart.x) / this._displayScale;
+      const dy = (pos.y - this._dragStart.y) / this._displayScale;
+      const sw = this._sourceCanvas.width;
+      const sh = this._sourceCanvas.height;
+      this._sel.cx = Math.max(this._sel.halfW, Math.min(sw - this._sel.halfW, this._lastCenter.cx + dx));
+      this._sel.cy = Math.max(this._sel.halfH, Math.min(sh - this._sel.halfH, this._lastCenter.cy + dy));
+      this._render();
+    } else if (e.touches.length === 2 && this._pinchStartDist) {
+      const curDist = this._getTouchDist(e.touches);
+      const ratio = curDist / this._pinchStartDist;
+      const s = this._sel;
+      const newHalfW = Math.max(20, Math.min(this._sourceCanvas.width / 2, this._pinchStartHalfW * ratio));
+      const newHalfH = newHalfW / this._targetRatio;
+      s.halfW = newHalfW;
+      s.halfH = newHalfH;
+      const sw = this._sourceCanvas.width;
+      const sh = this._sourceCanvas.height;
+      s.cx = Math.max(s.halfW, Math.min(sw - s.halfW, s.cx));
+      s.cy = Math.max(s.halfH, Math.min(sh - s.halfH, s.cy));
+      this._render();
+    }
+  },
+
+  _onTouchEnd() {
+    this._isDragging = false;
+    this._pinchStartDist = null;
+  },
+
+  _getTouchPos(touch) {
+    const rect = this._leftCanvas.getBoundingClientRect();
+    const cssX = touch.clientX - rect.left;
+    const cssY = touch.clientY - rect.top;
+    if (cssX < 0 || cssX > rect.width || cssY < 0 || cssY > rect.height) return null;
+    return {
+      x: cssX * (this._leftCanvas.width / rect.width),
+      y: cssY * (this._leftCanvas.height / rect.height),
+    };
+  },
+
+  _getTouchDist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  },
+
   _onKeyDown(e) {
     if (e.key === 'Enter') this._confirm();
     if (e.key === 'Escape') this.close();
+  },
+
+  _zoom(factor) {
+    const s = this._sel;
+    const newHalfW = Math.max(20, Math.min(this._sourceCanvas.width / 2, s.halfW * factor));
+    s.halfW = newHalfW;
+    s.halfH = newHalfW / this._targetRatio;
+    const sw = this._sourceCanvas.width;
+    const sh = this._sourceCanvas.height;
+    s.cx = Math.max(s.halfW, Math.min(sw - s.halfW, s.cx));
+    s.cy = Math.max(s.halfH, Math.min(sh - s.halfH, s.cy));
+    this._render();
   },
 
   _getCanvasPos(e) {
@@ -233,10 +320,12 @@ const CropSelector = {
     });
 
     // 提示文字
+    const isTouch = 'ontouchstart' in window;
+    const hint = isTouch ? '单指拖动 · 双指缩放 · 确认按钮完成' : '拖拽移动 · 滚轮缩放 · Enter确认';
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('拖拽移动 · 滚轮缩放 · Enter确认', canvas.width / 2, canvas.height - 12);
+    ctx.fillText(hint, canvas.width / 2, canvas.height - 12);
   },
 
   _renderRight() {
@@ -305,6 +394,10 @@ const CropSelector = {
 document.addEventListener('DOMContentLoaded', () => {
   const confirmBtn = document.getElementById('cropConfirmBtn');
   const cancelBtn = document.getElementById('cropCancelBtn');
+  const zoomIn = document.getElementById('cropZoomIn');
+  const zoomOut = document.getElementById('cropZoomOut');
   if (confirmBtn) confirmBtn.addEventListener('click', () => CropSelector._confirm());
   if (cancelBtn) cancelBtn.addEventListener('click', () => CropSelector.close());
+  if (zoomIn) zoomIn.addEventListener('click', () => CropSelector._zoom(1.15));
+  if (zoomOut) zoomOut.addEventListener('click', () => CropSelector._zoom(0.87));
 });

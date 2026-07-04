@@ -434,7 +434,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 3px;
 }
 
-/* 右侧信息面板 */
+/* 左侧信息面板 */
 .info-item {
   display: flex;
   justify-content: space-between;
@@ -445,6 +445,33 @@ input[type="range"]::-webkit-slider-thumb {
 .info-item:last-child { border-bottom: none; }
 .info-item .info-label { color: var(--text-light); }
 .info-item .info-value { font-weight: 500; }
+
+/* 选区裁剪缩放按钮 */
+.crop-zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+.crop-canvas-wrap { position: relative; }
+.crop-zoom-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.crop-zoom-btn:active { background: rgba(0,0,0,0.8); }
 
 /* 工具按钮组 */
 .tool-group {
