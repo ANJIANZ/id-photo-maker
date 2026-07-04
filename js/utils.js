@@ -351,6 +351,162 @@ const Storage = {
   },
 };
 
+/**
+ * 智能居中裁剪——以原图中间区域为优先，生成符合目标宽高比的最大内容区域
+ * 适合封面图/缩略图快速适配，不损失有效像素
+ *
+ * @param {HTMLCanvasElement} sourceCanvas - 源图像
+ * @param {number} targetRatio - 目标宽高比 (width/height)
+ * @returns {HTMLCanvasElement} 裁剪后的 Canvas
+ */
+function smartCropToRatio(sourceCanvas, targetRatio) {
+  const srcW = sourceCanvas.width;
+  const srcH = sourceCanvas.height;
+  const srcRatio = srcW / srcH;
+
+  let cropX, cropY, cropW, cropH;
+
+  if (Math.abs(srcRatio - targetRatio) < 0.001) {
+    return sourceCanvas;
+  }
+
+  if (srcRatio > targetRatio) {
+    // 源图更宽 → 裁剪宽度
+    cropH = srcH;
+    cropW = Math.round(srcH * targetRatio);
+    cropX = Math.round((srcW - cropW) / 2);
+    cropY = 0;
+  } else {
+    // 源图更高 → 裁剪高度
+    cropW = srcW;
+    cropH = Math.round(srcW / targetRatio);
+    cropX = 0;
+    cropY = Math.round((srcH - cropH) / 2);
+  }
+
+  const out = document.createElement('canvas');
+  out.width = cropW;
+  out.height = cropH;
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(sourceCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+  return out;
+}
+
+/**
+ * 从透明背景的抠图结果中检测人物边界框
+ * 通过扫描 alpha 通道找到非透明像素的最小包围矩形
+ * @param {HTMLCanvasElement} cutoutCanvas - 透明背景的抠图结果
+ * @returns {{left:number, top:number, right:number, bottom:number, width:number, height:number, cx:number, cy:number}}
+ *          返回边界框坐标和中心点，如果没找到人物返回 null
+ */
+function detectPersonBox(cutoutCanvas) {
+  const ctx = cutoutCanvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, cutoutCanvas.width, cutoutCanvas.height);
+  const data = imageData.data;
+  const w = cutoutCanvas.width, h = cutoutCanvas.height;
+
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  let found = false;
+
+  // 步进采样（大图降采样加速）
+  const step = Math.max(1, Math.round(Math.min(w, h) / 200));
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      const alpha = data[(y * w + x) * 4 + 3];
+      if (alpha > 30) { // 阈值 > 30 视为人物区域
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        found = true;
+      }
+    }
+  }
+
+  if (!found) return null;
+
+  // 精确边界（在采样边界附近逐像素修正）
+  // 上边界
+  for (let y = Math.max(0, minY - step); y <= Math.min(h - 1, minY + step); y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (data[(y * w + x) * 4 + 3] > 30) { minY = y; y = h; break; }
+    }
+  }
+  // 下边界
+  for (let y = Math.min(h - 1, maxY + step); y >= Math.max(0, maxY - step); y--) {
+    for (let x = minX; x <= maxX; x++) {
+      if (data[(y * w + x) * 4 + 3] > 30) { maxY = y; y = -1; break; }
+    }
+  }
+  // 左边界
+  for (let x = Math.max(0, minX - step); x <= Math.min(w - 1, minX + step); x++) {
+    for (let y = minY; y <= maxY; y++) {
+      if (data[(y * w + x) * 4 + 3] > 30) { minX = x; x = w; break; }
+    }
+  }
+  // 右边界
+  for (let x = Math.min(w - 1, maxX + step); x >= Math.max(0, maxX - step); x--) {
+    for (let y = minY; y <= maxY; y++) {
+      if (data[(y * w + x) * 4 + 3] > 30) { maxX = x; x = -1; break; }
+    }
+  }
+
+  return {
+    left: minX, top: minY,
+    right: maxX, bottom: maxY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+    cx: (minX + maxX) / 2,
+    cy: (minY + maxY) / 2,
+  };
+}
+
+/**
+ * 根据人物边界框和证件照尺寸，计算最佳缩放和偏移
+ * 中国证件照标准比例：头部高度约占照片总高度的 55-65%
+ * 头顶距照片上边距约占照片总高度的 6-10%
+ *
+ * @param {object} personBox - detectPersonBox 的返回值
+ * @param {number} targetPxW - 目标尺寸像素宽度
+ * @param {number} targetPxH - 目标尺寸像素高度
+ * @returns {{scale:number, offsetX:number, offsetY:number}}
+ */
+function calcAutoFit(personBox, targetPxW, targetPxH) {
+  // 估计头部区域：人物上半身的前 35% 高度视为头部
+  const headHeight = personBox.height * 0.35;
+  // 目标：头部占照片高度的 60%
+  const targetHeadRatio = 0.60;
+  // 目标：头顶距照片上沿占照片高度的 8%
+  const targetTopMarginRatio = 0.08;
+
+  // 计算需要的缩放：使 headHeight 缩放后 = targetPxH * targetHeadRatio
+  const scaleForHead = (targetPxH * targetHeadRatio) / headHeight;
+
+  // 计算 offsetY：使头顶位于照片上方 targetTopMarginRatio 位置
+  // 头顶位置 = personBox.top + 人物框上方到头顶的距离（头部前 15% 的位置）
+  const headTop = personBox.top + personBox.height * 0.05;
+  // 缩放后头顶位置在照片中的比例
+  // 缩放后头顶到照片顶部的距离 = offsetY * (targetPxH - 缩放后人物高度)
+  // 缩放后人物高度 = personBox.height * scaleForHead
+  // 头顶到人物框顶部的距离（头部前 5%） = personBox.height * 0.05 * scaleForHead
+  // 所以：offsetY * (targetPxH - personBoxHeight * scale) + personBoxHeight * 0.05 * scale = targetPxH * targetTopMarginRatio
+  const scaledPersonH = personBox.height * scaleForHead;
+  const scaledHeadTopOffset = personBox.height * 0.05 * scaleForHead;
+  const offsetY = ((targetPxH * targetTopMarginRatio) - scaledHeadTopOffset) / (targetPxH - scaledPersonH + 1);
+
+  // 水平居中
+  const offsetX = 0.5;
+
+  // 限制范围
+  return {
+    scale: Math.max(0.5, Math.min(2.0, scaleForHead)),
+    offsetX: 0.5,
+    offsetY: Math.max(0, Math.min(1, offsetY)),
+  };
+}
+
 // 暴露到全局
 window.Utils = {
   loadImageFile,
@@ -360,12 +516,15 @@ window.Utils = {
   hexToRgb,
   compositeOnBackground,
   cropToSize,
+  smartCropToRatio,
   applyFilters,
   rotateCanvas,
   flipCanvasHorizontal,
   removeColorBackground,
   pickColor,
   refineAlphaEdge,
+  detectPersonBox,
+  calcAutoFit,
   debounce,
   Storage,
 };

@@ -107,6 +107,7 @@
           <div class="slider-label"><span>缩放</span><span id="scaleVal">100%</span></div>
           <input type="range" id="scale" min="50" max="200" value="100">
         </div>
+        <button class="tool-btn" id="smartCropBtn" style="width:100%;margin-top:8px;border-color:var(--primary);color:var(--primary);">✂️ 智能裁剪（居中 → 目标比例）</button>
       </div>
     </div>
 
@@ -123,6 +124,7 @@
       <div class="bottom-bar">
         <button class="btn btn-outline" id="reuploadBtn">重新上传</button>
         <button class="btn btn-primary" id="cutoutBtn" disabled>🤖 AI 抠图</button>
+        <button class="btn btn-outline" id="autoFitBtn" disabled>📐 自动适配</button>
         <button class="btn btn-success" id="toPrintBtn">🖨️ 排版打印 →</button>
         <button class="btn btn-primary" id="downloadBtn">⬇️ 下载证件照</button>
       </div>

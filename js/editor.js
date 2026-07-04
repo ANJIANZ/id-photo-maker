@@ -16,6 +16,8 @@
   const manualSection = document.getElementById('manualCutoutSection');
   const pickColorBtn = document.getElementById('pickColorBtn');
   const manualCutoutBtn = document.getElementById('manualCutoutBtn');
+  const autoFitBtn = document.getElementById('autoFitBtn');
+  const smartCropBtn = document.getElementById('smartCropBtn');
 
   // ===== 状态 =====
   const state = {
@@ -178,6 +180,8 @@
     });
 
     cutoutBtn.addEventListener('click', doCutout);
+    autoFitBtn.addEventListener('click', doAutoFit);
+    smartCropBtn.addEventListener('click', doSmartCrop);
     downloadBtn.addEventListener('click', downloadPhoto);
     toPrintBtn.addEventListener('click', goToPrint);
     reuploadBtn.addEventListener('click', () => {
@@ -269,11 +273,12 @@
       state.cutoutImage = result;
       state.hasCutout = true;
       document.getElementById('infoCutout').textContent = '已自动抠图';
+      autoFitBtn.disabled = false;
       document.querySelector('.color-option:first-child')?.classList.remove('active');
     } catch (e) {
       console.warn('自动抠图失败', e);
     }
-    render();
+    doAutoFit();
   }
 
   // ===== AI 抠图 =====
@@ -295,7 +300,8 @@
       state.cutoutImage = result;
       state.hasCutout = true;
       document.getElementById('infoCutout').textContent = '已抠图';
-      render();
+      autoFitBtn.disabled = false;
+      doAutoFit();
     } catch (err) {
       console.error('AI 抠图失败:', err);
       manualSection.style.display = 'block';
@@ -323,10 +329,66 @@
       state.cutoutImage = result;
       state.hasCutout = true;
       document.getElementById('infoCutout').textContent = '已抠图（手动）';
-      render();
+      autoFitBtn.disabled = false;
+      doAutoFit();
     } catch (err) {
       alert('手动抠图失败：' + err.message);
     }
+  }
+
+  // ===== 智能裁剪——以原图中心为优先，裁剪到目标尺寸比例 =====
+  function doSmartCrop() {
+    if (!state.originalImage) return;
+    const size = getSizeById(state.sizeId);
+    const targetRatio = size.width / size.height;
+
+    // 裁剪原图
+    state.originalImage = Utils.smartCropToRatio(state.originalImage, targetRatio);
+    // 如果已抠图，同步裁剪抠图结果
+    if (state.cutoutImage) {
+      state.cutoutImage = Utils.smartCropToRatio(state.cutoutImage, targetRatio);
+    }
+    // 重置偏移和缩放
+    state.offsetX = 0.5;
+    state.offsetY = 0.4;
+    state.scale = 1.0;
+    document.getElementById('offsetX').value = 50;
+    document.getElementById('offsetXVal').textContent = '50%';
+    document.getElementById('offsetY').value = 40;
+    document.getElementById('offsetYVal').textContent = '40%';
+    document.getElementById('scale').value = 100;
+    document.getElementById('scaleVal').textContent = '100%';
+
+    render();
+  }
+
+  // ===== 自动适配——检测人物位置，按证件照标准比例调整缩放和偏移 =====
+  function doAutoFit() {
+    if (!state.cutoutImage) return;
+    const size = getSizeById(state.sizeId);
+    const pxW = mmToPixel(size.width);
+    const pxH = mmToPixel(size.height);
+
+    const box = Utils.detectPersonBox(state.cutoutImage);
+    if (!box) {
+      render();
+      return;
+    }
+
+    const fit = Utils.calcAutoFit(box, pxW, pxH);
+    state.scale = fit.scale;
+    state.offsetX = fit.offsetX;
+    state.offsetY = fit.offsetY;
+
+    // 更新滑块显示
+    document.getElementById('scale').value = Math.round(fit.scale * 100);
+    document.getElementById('scaleVal').textContent = Math.round(fit.scale * 100) + '%';
+    document.getElementById('offsetX').value = 50;
+    document.getElementById('offsetXVal').textContent = '50%';
+    document.getElementById('offsetY').value = Math.round(fit.offsetY * 100);
+    document.getElementById('offsetYVal').textContent = Math.round(fit.offsetY * 100) + '%';
+
+    render();
   }
 
   // ===== 渲染预览 =====
