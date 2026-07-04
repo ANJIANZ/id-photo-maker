@@ -35,6 +35,9 @@
     offsetY: 0.4,
     scale: 1.0,
     feather: 3,
+    smooth: 0,
+    whiten: 0,
+    sharpen: 0,
     hasCutout: false,
     pickingColor: false,
     pickedColor: { r: 200, g: 200, b: 200 },
@@ -165,6 +168,9 @@
       { id: 'brightness', valId: 'brightnessVal', key: 'brightness', fmt: v => v },
       { id: 'contrast', valId: 'contrastVal', key: 'contrast', fmt: v => v },
       { id: 'saturate', valId: 'saturateVal', key: 'saturate', fmt: v => v },
+      { id: 'smooth', valId: 'smoothVal', key: 'smooth', fmt: v => v },
+      { id: 'whiten', valId: 'whitenVal', key: 'whiten', fmt: v => v },
+      { id: 'sharpen', valId: 'sharpenVal', key: 'sharpen', fmt: v => v },
       { id: 'offsetX', valId: 'offsetXVal', key: 'offsetX', fmt: v => v + '%', map: v => v / 100 },
       { id: 'offsetY', valId: 'offsetYVal', key: 'offsetY', fmt: v => v + '%', map: v => v / 100 },
       { id: 'scale', valId: 'scaleVal', key: 'scale', fmt: v => v + '%', map: v => v / 100 },
@@ -443,6 +449,29 @@
     }
     if (state.flipH) {
       source = Utils.flipCanvasHorizontal(source);
+    }
+    if (state.smooth > 0 || state.whiten > 0 || state.sharpen > 0) {
+      const bCtx = document.createElement('canvas').getContext('2d');
+      bCtx.canvas.width = source.width;
+      bCtx.canvas.height = source.height;
+      let origAlpha = null;
+      if (state.hasCutout) {
+        const od = source.getContext('2d').getImageData(0, 0, source.width, source.height);
+        origAlpha = new Uint8ClampedArray(source.width * source.height);
+        for (let i = 0; i < origAlpha.length; i++) origAlpha[i] = od.data[i * 4 + 3];
+        bCtx.fillStyle = '#FFFFFF';
+        bCtx.fillRect(0, 0, source.width, source.height);
+      }
+      bCtx.drawImage(source, 0, 0);
+      const imageData = bCtx.getImageData(0, 0, source.width, source.height);
+      if (state.smooth > 0) Utils.skinSmooth(imageData, state.smooth);
+      if (state.whiten > 0) Utils.skinWhiten(imageData, state.whiten);
+      if (state.sharpen > 0) Utils.sharpen(imageData, state.sharpen);
+      if (origAlpha) {
+        for (let i = 0; i < origAlpha.length; i++) imageData.data[i * 4 + 3] = origAlpha[i];
+      }
+      bCtx.putImageData(imageData, 0, 0);
+      source = bCtx.canvas;
     }
     if (state.brightness !== 0 || state.contrast !== 0 || state.saturate !== 0) {
       source = Utils.applyFilters(source, {

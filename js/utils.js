@@ -507,6 +507,136 @@ function calcAutoFit(personBox, targetPxW, targetPxH) {
   };
 }
 
+// ===== 美颜算法 =====
+
+/**
+ * 磨皮——边缘保留平滑（表面模糊）
+ * 对非边缘区域做模糊，边缘区域保持清晰
+ * @param {ImageData} imageData
+ * @param {number} amount - 0-100，强度
+ * @returns {ImageData}
+ */
+function skinSmooth(imageData, amount) {
+  if (amount <= 0) return imageData;
+  const w = imageData.width, h = imageData.height;
+  const src = new Uint8ClampedArray(imageData.data);
+  const out = new Uint8ClampedArray(src);
+  const radius = Math.max(1, Math.round(amount / 20));
+  const threshold = Math.max(10, 50 - amount * 0.35);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let rSum = 0, gSum = 0, bSum = 0, weightSum = 0;
+      const idx = (y * w + x) * 4;
+      const cr = src[idx], cg = src[idx + 1], cb = src[idx + 2];
+
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const sx = x + dx, sy = y + dy;
+          if (sx < 0 || sx >= w || sy < 0 || sy >= h) continue;
+          const si = (sy * w + sx) * 4;
+          const pr = src[si], pg = src[si + 1], pb = src[si + 2];
+          const diff = Math.abs(pr - cr) + Math.abs(pg - cg) + Math.abs(pb - cb);
+          if (diff < threshold * 3) {
+            const weight = 1 - diff / (threshold * 3);
+            rSum += pr * weight; gSum += pg * weight; bSum += pb * weight;
+            weightSum += weight;
+          }
+        }
+      }
+      const oi = idx;
+      if (weightSum > 0) {
+        const blend = amount / 100;
+        out[oi]     = Math.round(cr + (rSum / weightSum - cr) * blend);
+        out[oi + 1] = Math.round(cg + (gSum / weightSum - cg) * blend);
+        out[oi + 2] = Math.round(cb + (bSum / weightSum - cb) * blend);
+      }
+    }
+  }
+  imageData.data.set(out);
+  return imageData;
+}
+
+/**
+ * 美白——肤色检测 + 亮度提升
+ * 在 YCbCr 空间中检测肤色区域，选择性提亮
+ * @param {ImageData} imageData
+ * @param {number} amount - 0-100，强度
+ * @returns {ImageData}
+ */
+function skinWhiten(imageData, amount) {
+  if (amount <= 0) return imageData;
+  const data = imageData.data;
+  const boost = amount / 100 * 40;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    // YCbCr 肤色检测: Y > 80, 85 < Cb < 135, 135 < Cr < 180
+    const y  = 0.299 * r + 0.587 * g + 0.114 * b;
+    const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+    const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+    const isSkin = y > 80 && cb > 85 && cb < 135 && cr > 135 && cr < 180;
+    if (isSkin) {
+      data[i]     = Math.min(255, r + boost);
+      data[i + 1] = Math.min(255, g + boost * 0.8);
+      data[i + 2] = Math.min(255, b + boost * 0.6);
+    }
+  }
+  return imageData;
+}
+
+/**
+ * 锐化——反锐化掩模 (Unsharp Mask)
+ * @param {ImageData} imageData
+ * @param {number} amount - 0-100，强度
+ * @returns {ImageData}
+ */
+function sharpen(imageData, amount) {
+  if (amount <= 0) return imageData;
+  const w = imageData.width, h = imageData.height;
+  const src = new Uint8ClampedArray(imageData.data);
+  const data = imageData.data;
+  const strength = amount / 100 * 0.8;
+
+  // 3x3 拉普拉斯核做边缘提取
+  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = (y * w + x) * 4;
+      let rAcc = 0, gAcc = 0, bAcc = 0;
+      let ki = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const pi = ((y + dy) * w + (x + dx)) * 4;
+          rAcc += kernel[ki] * src[pi];
+          gAcc += kernel[ki] * src[pi + 1];
+          bAcc += kernel[ki] * src[pi + 2];
+          ki++;
+        }
+      }
+      const blend = strength;
+      data[idx]     = Math.max(0, Math.min(255, src[idx]     + rAcc * blend));
+      data[idx + 1] = Math.max(0, Math.min(255, src[idx + 1] + gAcc * blend));
+      data[idx + 2] = Math.max(0, Math.min(255, src[idx + 2] + bAcc * blend));
+    }
+  }
+  return imageData;
+}
+
+/**
+ * 一键应用全部美颜——磨皮 → 美白 → 锐化
+ */
+function applyBeauty(canvas, smooth, whiten, sharp) {
+  const ctx = canvas.getContext('2d');
+  let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  if (smooth > 0) imageData = skinSmooth(imageData, smooth);
+  if (whiten > 0) imageData = skinWhiten(imageData, whiten);
+  if (sharp > 0) imageData = sharpen(imageData, sharp);
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
 // 暴露到全局
 window.Utils = {
   loadImageFile,
@@ -525,6 +655,10 @@ window.Utils = {
   refineAlphaEdge,
   detectPersonBox,
   calcAutoFit,
+  skinSmooth,
+  skinWhiten,
+  sharpen,
+  applyBeauty,
   debounce,
   Storage,
 };
