@@ -124,9 +124,7 @@
       </div>
       <div class="bottom-bar">
         <button class="btn btn-outline" id="reuploadBtn">重新上传</button>
-        <button class="btn btn-primary" id="cutoutBtn" disabled>🤖 AI 抠图</button>
         <button class="btn btn-outline" id="cropSelectBtn2">📐 选区裁剪</button>
-        <button class="btn btn-success" id="toPrintBtn">🖨️ 排版打印 →</button>
         <button class="btn btn-primary" id="downloadBtn">⬇️ 下载证件照</button>
       </div>
     </div>
@@ -157,6 +155,11 @@
       <div class="info-item">
         <span class="info-label">抠图状态</span>
         <span class="info-value" id="infoCutout">未抠图</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+        <button class="btn btn-primary" id="cutoutBtn" disabled style="width:100%;">🤖 AI 抠图</button>
+        <button class="btn btn-success" id="toPrintBtn" style="width:100%;">🖨️ 排版打印 →</button>
       </div>
 
       <div style="margin-top:12px; padding:12px; background:#fef3c7; border-radius:6px; font-size:12px; color:#92400e; line-height:1.5;">
