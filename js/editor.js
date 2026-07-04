@@ -18,6 +18,7 @@
   const manualCutoutBtn = document.getElementById('manualCutoutBtn');
   const autoFitBtn = document.getElementById('autoFitBtn');
   const smartCropBtn = document.getElementById('smartCropBtn');
+  const cropSelectBtn = document.getElementById('cropSelectBtn');
 
   // ===== 状态 =====
   const state = {
@@ -182,6 +183,7 @@
     cutoutBtn.addEventListener('click', doCutout);
     autoFitBtn.addEventListener('click', doAutoFit);
     smartCropBtn.addEventListener('click', doSmartCrop);
+    cropSelectBtn.addEventListener('click', doCropSelect);
     downloadBtn.addEventListener('click', downloadPhoto);
     toPrintBtn.addEventListener('click', goToPrint);
     reuploadBtn.addEventListener('click', () => {
@@ -360,6 +362,32 @@
     document.getElementById('scaleVal').textContent = '100%';
 
     render();
+  }
+
+  // ===== 选区裁剪——手动拖拽选区的交互式裁剪 =====
+  function doCropSelect() {
+    if (!state.originalImage) return;
+    const size = getSizeById(state.sizeId);
+    const targetRatio = size.width / size.height;
+
+    CropSelector.open(state.originalImage, targetRatio, (croppedCanvas) => {
+      state.originalImage = croppedCanvas;
+      if (state.cutoutImage) {
+        // 同步裁剪抠图结果（按相同比例）
+        state.cutoutImage = Utils.smartCropToRatio(state.cutoutImage, targetRatio);
+      }
+      state.offsetX = 0.5;
+      state.offsetY = 0.4;
+      state.scale = 1.0;
+      document.getElementById('offsetX').value = 50;
+      document.getElementById('offsetXVal').textContent = '50%';
+      document.getElementById('offsetY').value = 40;
+      document.getElementById('offsetYVal').textContent = '40%';
+      document.getElementById('scale').value = 100;
+      document.getElementById('scaleVal').textContent = '100%';
+      if (state.hasCutout) autoFitBtn.disabled = false;
+      render();
+    });
   }
 
   // ===== 自动适配——检测人物位置，按证件照标准比例调整缩放和偏移 =====

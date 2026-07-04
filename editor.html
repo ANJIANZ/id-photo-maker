@@ -108,6 +108,7 @@
           <input type="range" id="scale" min="50" max="200" value="100">
         </div>
         <button class="tool-btn" id="smartCropBtn" style="width:100%;margin-top:8px;border-color:var(--primary);color:var(--primary);">✂️ 智能裁剪（居中 → 目标比例）</button>
+        <button class="tool-btn" id="cropSelectBtn" style="width:100%;margin-top:6px;border-color:var(--primary);color:var(--primary);">📐 选区裁剪（手动拖拽）</button>
       </div>
     </div>
 
@@ -164,9 +165,35 @@
     </div>
   </div>
 
+  <div class="modal" id="cropModal">
+    <div class="modal-content crop-modal-content">
+      <h3>📐 选区裁剪</h3>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:16px;">拖拽移动选区 · 滚轮缩放 · 右侧实时预览裁剪效果</p>
+      <div class="crop-layout">
+        <div class="crop-left">
+          <div class="crop-canvas-wrap">
+            <canvas id="cropLeftCanvas"></canvas>
+          </div>
+        </div>
+        <div class="crop-right">
+          <div class="crop-preview-label">裁剪预览</div>
+          <div class="crop-canvas-wrap">
+            <canvas id="cropRightCanvas"></canvas>
+          </div>
+          <div class="crop-info" id="cropInfo">选区: --×--px</div>
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn btn-outline" id="cropCancelBtn">取消</button>
+        <button class="btn btn-primary" id="cropConfirmBtn">✓ 确认裁剪</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/sizes.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/background-removal.js"></script>
+  <script src="js/crop-select.js"></script>
   <script src="js/editor.js"></script>
 </body>
 </html>
