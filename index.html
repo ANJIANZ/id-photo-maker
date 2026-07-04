@@ -97,15 +97,20 @@
   <script src="js/upload.js"></script>
   <script>
     // 试用示例照片
-    document.getElementById('demoBtn')?.addEventListener('click', async () => {
+    document.getElementById('demoBtn')?.addEventListener('click', () => {
       try {
-        const resp = await fetch('people_demo.png');
-        const blob = await resp.blob();
-        const img = await Utils.loadImageFile(blob);
-        const canvas = Utils.imageToCanvas(img, 1600);
-        const dataURL = Utils.canvasToDataURL(canvas, 'image/png');
-        Utils.Storage.set('originalImage', dataURL);
-        window.location.href = 'editor.html';
+        // 使用 Image 对象加载（兼容 file:// 协议，避免 fetch 跨域限制）
+        const img = new Image();
+        img.onload = () => {
+          const canvas = Utils.imageToCanvas(img, 1600);
+          const dataURL = Utils.canvasToDataURL(canvas, 'image/png');
+          Utils.Storage.set('originalImage', dataURL);
+          window.location.href = 'editor.html';
+        };
+        img.onerror = () => {
+          alert('加载示例照片失败，请检查 people_demo.png 文件是否存在');
+        };
+        img.src = 'people_demo.png';
       } catch (err) {
         alert('加载示例照片失败：' + err.message);
       }
