@@ -16,7 +16,6 @@
   const manualSection = document.getElementById('manualCutoutSection');
   const pickColorBtn = document.getElementById('pickColorBtn');
   const manualCutoutBtn = document.getElementById('manualCutoutBtn');
-  const autoFitBtn = document.getElementById('autoFitBtn');
   const smartCropBtn = document.getElementById('smartCropBtn');
   const cropSelectBtn = document.getElementById('cropSelectBtn');
 
@@ -181,7 +180,6 @@
     });
 
     cutoutBtn.addEventListener('click', doCutout);
-    autoFitBtn.addEventListener('click', doAutoFit);
     smartCropBtn.addEventListener('click', doSmartCrop);
     cropSelectBtn.addEventListener('click', doCropSelect);
     downloadBtn.addEventListener('click', downloadPhoto);
@@ -275,7 +273,6 @@
       state.cutoutImage = result;
       state.hasCutout = true;
       document.getElementById('infoCutout').textContent = '已自动抠图';
-      autoFitBtn.disabled = false;
       document.querySelector('.color-option:first-child')?.classList.remove('active');
     } catch (e) {
       console.warn('自动抠图失败', e);
@@ -302,7 +299,6 @@
       state.cutoutImage = result;
       state.hasCutout = true;
       document.getElementById('infoCutout').textContent = '已抠图';
-      autoFitBtn.disabled = false;
       doAutoFit();
     } catch (err) {
       console.error('AI 抠图失败:', err);
@@ -331,7 +327,6 @@
       state.cutoutImage = result;
       state.hasCutout = true;
       document.getElementById('infoCutout').textContent = '已抠图（手动）';
-      autoFitBtn.disabled = false;
       doAutoFit();
     } catch (err) {
       alert('手动抠图失败：' + err.message);
@@ -385,7 +380,6 @@
       document.getElementById('offsetYVal').textContent = '40%';
       document.getElementById('scale').value = 100;
       document.getElementById('scaleVal').textContent = '100%';
-      if (state.hasCutout) autoFitBtn.disabled = false;
       render();
     });
   }
