@@ -385,7 +385,7 @@ const CropSelector = {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(this._sourceCanvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
-    this._onConfirm(out);
+    this._onConfirm(out, { x: srcX, y: srcY, w: srcW, h: srcH });
     this.close();
   },
 };

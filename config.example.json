@@ -1,0 +1,5 @@
+{
+  "baiduApiKey": "你的百度API Key",
+  "baiduSecretKey": "你的百度Secret Key",
+  "maxImageSize": 1600
+}

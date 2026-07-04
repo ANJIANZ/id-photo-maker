@@ -11,23 +11,126 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const HOST = '0.0.0.0'; // 监听所有网络接口，允许手机访问
+const HOST = '0.0.0.0';
 
-// 获取本机局域网 IP
-function getLocalIP() {
-  const os = require('os');
-  const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
-      }
+// 读取配置
+let CONFIG = {
+  baiduApiKey: '',
+  baiduSecretKey: '',
+  maxImageSize: 1600
+};
+try {
+  const configRaw = fs.readFileSync(path.join(ROOT, 'config.json'), 'utf-8');
+  CONFIG = JSON.parse(configRaw);
+} catch (e) {
+  console.warn('无法读取 config.json:', e.message);
+}
+
+// ===== 百度 AI 抠图 API =====
+const BaiduAI = {
+  _token: null,
+  _tokenTime: 0,
+
+  // 获取 access_token（带缓存，30天有效）
+  async getAccessToken() {
+    // 每25天刷新一次
+    if (this._token && Date.now() - this._tokenTime < 25 * 24 * 60 * 60 * 1000) {
+      return this._token;
     }
+
+    const tokenUrl = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${CONFIG.baiduApiKey}&client_secret=${CONFIG.baiduSecretKey}`;
+    const resp = await fetch(tokenUrl);
+    const data = await resp.json();
+    if (data.access_token) {
+      this._token = data.access_token;
+      this._tokenTime = Date.now();
+      return this._token;
+    }
+    throw new Error(`获取 access_token 失败: ${JSON.stringify(data)}`);
+  },
+
+  // 智能抠图
+  async removeBackground(base64Data, onProgress) {
+    if (!CONFIG.baiduApiKey || !CONFIG.baiduSecretKey) {
+      throw new Error('请在 config.json 中配置 baiduApiKey 和 baiduSecretKey');
+    }
+
+    if (onProgress) onProgress(0.2);
+
+    const accessToken = await this.getAccessToken();
+
+    if (onProgress) onProgress(0.5);
+
+    const requestBody = {
+      image: base64Data,
+      method: 'auto',
+      refine_mask: 'true',
+      return_form: 'rgba',
+    };
+
+    const apiUrl = 'https://aip.baidubce.com/rest/2.0/image-process/v1/segment?access_token=' + accessToken;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (onProgress) onProgress(0.8);
+
+    const result = await response.json();
+    if (result.error_code) {
+      throw new Error(`百度API错误(${result.error_code}): ${result.error_msg || JSON.stringify(result)}`);
+    }
+
+    if (onProgress) onProgress(1.0);
+
+    // 返回 base64 图像数据
+    return result.image;
+  },
+};
+
+// API 路由
+async function handleApiCutout(req, res) {
+  try {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { image } = JSON.parse(body);
+        if (!image) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '缺少 image 字段' }));
+          return;
+        }
+
+        // 前端传过来的是完整 data URL，提取 base64 部分
+        const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+
+        const result = await BaiduAI.removeBackground(base64, (p) => {
+          // 进度可以通过 SSE 发送，这里简化为同步
+        });
+
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(JSON.stringify({ data: result }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+  } catch (err) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: '请求解析失败' }));
   }
-  return 'localhost';
 }
 
 const MIME_TYPES = {
@@ -45,23 +148,39 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  // 设置跨域隔离头（AI 抠图需要 SharedArrayBuffer）
-  // 使用 credentialless 替代 require-corp，兼容 CDN 跨域资源加载
+  const parsed = url.parse(req.url);
+  const urlPath = parsed.pathname;
+
+  // 设置跨域隔离头
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
-  // 允许跨域
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  let url = req.url.split('?')[0];
-  if (url === '/') url = '/index.html';
+  // API 路由
+  if (urlPath === '/api/cutout' && req.method === 'POST') {
+    return handleApiCutout(req, res);
+  }
 
-  const filePath = path.join(ROOT, url);
-  const ext = path.extname(filePath);
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    return res.end();
+  }
 
-  fs.readFile(filePath, (err, data) => {
+  // 静态文件
+  let filePath = urlPath.split('?')[0];
+  if (filePath === '/') filePath = '/index.html';
+  const fullPath = path.join(ROOT, filePath);
+  const ext = path.extname(fullPath);
+
+  fs.readFile(fullPath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('404 Not Found: ' + url);
+      res.end('404 Not Found: ' + filePath);
       return;
     }
     res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
@@ -70,13 +189,12 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  const localIP = getLocalIP();
   console.log('========================================');
   console.log('  证件照制作网站 - 本地服务器已启动');
   console.log('  COOP/COEP 头已设置 (AI 抠图所需)');
+  console.log('  百度 AI 接口已启用: /api/cutout');
   console.log('========================================');
   console.log(`  本机访问: http://localhost:${PORT}`);
-  console.log(`  手机访问: http://${localIP}:${PORT}`);
   console.log(`  退出: Ctrl+C`);
   console.log('========================================');
 });

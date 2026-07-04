@@ -13,9 +13,6 @@
   const downloadBtn = document.getElementById('downloadBtn');
   const toPrintBtn = document.getElementById('toPrintBtn');
   const reuploadBtn = document.getElementById('reuploadBtn');
-  const manualSection = document.getElementById('manualCutoutSection');
-  const pickColorBtn = document.getElementById('pickColorBtn');
-  const manualCutoutBtn = document.getElementById('manualCutoutBtn');
   const smartCropBtn = document.getElementById('smartCropBtn');
   const cropSelectBtn2 = document.getElementById('cropSelectBtn2');
   const resetOriginalBtn = document.getElementById('resetOriginalBtn');
@@ -41,10 +38,6 @@
     whiten: 0,
     sharpen: 0,
     hasCutout: false,
-    pickingColor: false,
-    pickedColor: { r: 200, g: 200, b: 200 },
-    tolerance: 60,
-    smoothness: 2,
   };
 
   // 移动端面板折叠：点击标题切换展开/折叠，初始折叠编辑面板
@@ -67,7 +60,6 @@
     renderBgColors();
     renderSizes();
     bindControls();
-    bindManualCutout();
 
     // 检查是否从首页"试用示例照片"跳转过来
     const urlParams = new URLSearchParams(window.location.search);
@@ -217,10 +209,6 @@
     whiten: 0,
     sharpen: 0,
     hasCutout: false,
-    pickingColor: false,
-    pickedColor: { r: 200, g: 200, b: 200 },
-    tolerance: 60,
-    smoothness: 2,
   };
 
   function resetToOriginal() {
@@ -257,11 +245,6 @@
     document.getElementById('scaleVal').textContent = '100%';
 
     document.getElementById('infoCutout').textContent = '未抠图';
-    document.getElementById('pickedColorDisplay').style.background = `rgb(${state.pickedColor.r},${state.pickedColor.g},${state.pickedColor.b})`;
-    manualSection.style.display = 'none';
-    pickColorBtn.textContent = '🎯 吸取背景色';
-    pickColorBtn.style.borderColor = 'var(--danger)';
-    previewCanvas.style.cursor = 'default';
 
     render();
   }
@@ -321,181 +304,59 @@
     }
   }
 
-  // ===== 手动抠图绑定 =====
-  function bindManualCutout() {
-    pickColorBtn.addEventListener('click', () => {
-      state.pickingColor = !state.pickingColor;
-      pickColorBtn.style.borderColor = state.pickingColor ? '#dc2626' : 'var(--danger)';
-      pickColorBtn.textContent = state.pickingColor ? '🔄 点击预览图取色...' : '🎯 吸取背景色';
-      previewCanvas.style.cursor = state.pickingColor ? 'crosshair' : 'default';
-    });
-
-    document.getElementById('tolerance').addEventListener('input', (e) => {
-      state.tolerance = parseInt(e.target.value);
-      document.getElementById('toleranceVal').textContent = state.tolerance;
-    });
-
-    document.getElementById('smoothness').addEventListener('input', (e) => {
-      state.smoothness = parseInt(e.target.value);
-      document.getElementById('smoothnessVal').textContent = state.smoothness;
-    });
-
-    manualCutoutBtn.addEventListener('click', doManualCutout);
-
-    // 点击/触摸预览图取色（移动端支持）
-    function handleCanvasPick(e) {
-      if (!state.pickingColor || !state.originalImage) return;
-      e.preventDefault();
-      const rect = previewCanvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const scaleX = previewCanvas.width / rect.width;
-      const scaleY = previewCanvas.height / rect.height;
-      const x = Math.round((clientX - rect.left) * scaleX);
-      const y = Math.round((clientY - rect.top) * scaleY);
-      if (x < 0 || x >= previewCanvas.width || y < 0 || y >= previewCanvas.height) return;
-
-      const color = Utils.pickColor(previewCanvas, x, y);
-      state.pickedColor = color;
-      document.getElementById('pickedColorDisplay').style.background = `rgb(${color.r},${color.g},${color.b})`;
-
-      state.pickingColor = false;
-      pickColorBtn.textContent = '🎯 吸取背景色';
-      pickColorBtn.style.borderColor = 'var(--danger)';
-      previewCanvas.style.cursor = 'default';
-    }
-    previewCanvas.addEventListener('click', handleCanvasPick);
-    previewCanvas.addEventListener('touchend', handleCanvasPick);
-  }
-
-  // ===== 自动背景抠图（基于图像边缘采样） =====
-  function autoCutoutByBgColor() {
-    const canvas = state.originalImage;
-    const w = canvas.width, h = canvas.height;
-
-    // 从四角和边缘采样，找到最可能的主背景色
-    const samples = [];
-    const step = 10;
-    // 四角
-    const corners = [
-      { x: 5, y: 5 }, { x: w - 5, y: 5 },
-      { x: 5, y: h - 5 }, { x: w - 5, y: h - 5 },
-    ];
-    corners.forEach(p => samples.push(Utils.pickColor(canvas, p.x, p.y)));
-    // 顶部边缘
-    for (let x = 0; x < w; x += step) samples.push(Utils.pickColor(canvas, x, 3));
-    // 底部边缘
-    for (let x = 0; x < w; x += step) samples.push(Utils.pickColor(canvas, x, h - 3));
-    // 左侧边缘
-    for (let y = 0; y < h; y += step) samples.push(Utils.pickColor(canvas, 3, y));
-    // 右侧边缘
-    for (let y = 0; y < h; y += step) samples.push(Utils.pickColor(canvas, w - 3, y));
-
-    // 统计最频繁的颜色
-    const colorCounts = {};
-    samples.forEach(c => {
-      const key = `${Math.round(c.r / 20) * 20},${Math.round(c.g / 20) * 20},${Math.round(c.b / 20) * 20}`;
-      colorCounts[key] = (colorCounts[key] || 0) + 1;
-    });
-    const dominantKey = Object.entries(colorCounts).sort((a, b) => b[1] - a[1])[0][0];
-    const [dr, dg, db] = dominantKey.split(',').map(Number);
-
-    try {
-      const result = Utils.removeColorBackground(canvas, { r: dr, g: dg, b: db }, 50, 3);
-      state.cutoutImage = result;
-      state.hasCutout = true;
-      document.getElementById('infoCutout').textContent = '已自动抠图';
-      document.querySelector('.color-option:first-child')?.classList.remove('active');
-    } catch (e) {
-      console.warn('自动抠图失败', e);
-      alert('自动抠图失败，已保留原图。\n\n你可以尝试：\n1. 重新选择背景更统一的上传图\n2. 使用左侧“手动抠图”吸取背景色后再抠图\n\n错误：' + e.message);
-    }
-    doAutoFit();
-  }
-
-  // ===== 临时自动抠图（不改变全局状态，仅用于渲染预览） =====
-  function tryAutoCutoutForRender() {
-    const canvas = state.originalImage;
-    const w = canvas.width, h = canvas.height;
-
-    const samples = [];
-    const step = 10;
-    const corners = [
-      { x: 5, y: 5 }, { x: w - 5, y: 5 },
-      { x: 5, y: h - 5 }, { x: w - 5, y: h - 5 },
-    ];
-    corners.forEach(p => samples.push(Utils.pickColor(canvas, p.x, p.y)));
-    for (let x = 0; x < w; x += step) samples.push(Utils.pickColor(canvas, x, 3));
-    for (let x = 0; x < w; x += step) samples.push(Utils.pickColor(canvas, x, h - 3));
-    for (let y = 0; y < h; y += step) samples.push(Utils.pickColor(canvas, 3, y));
-    for (let y = 0; y < h; y += step) samples.push(Utils.pickColor(canvas, w - 3, y));
-
-    const colorCounts = {};
-    samples.forEach(c => {
-      const key = `${Math.round(c.r / 20) * 20},${Math.round(c.g / 20) * 20},${Math.round(c.b / 20) * 20}`;
-      colorCounts[key] = (colorCounts[key] || 0) + 1;
-    });
-    const dominantKey = Object.entries(colorCounts).sort((a, b) => b[1] - a[1])[0][0];
-    const [dr, dg, db] = dominantKey.split(',').map(Number);
-
-    try {
-      return Utils.removeColorBackground(canvas, { r: dr, g: dg, b: db }, 50, 3);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // ===== AI 抠图 =====
+  // ===== AI 抠图（仅百度AI） =====
   async function doCutout() {
     if (!state.originalImage) return;
     loadingOverlay.style.display = 'flex';
-    loadingText.textContent = '正在连接 CDN 加载抠图模型...';
-    progressFill.style.width = '0%';
+    loadingText.textContent = '正在使用百度AI抠图...';
+    progressFill.style.width = '30%';
 
     try {
-      const result = await BackgroundRemover.remove(state.originalImage, (progress) => {
-        if (progress < 0.5) {
-          loadingText.textContent = '正在下载 AI 模型文件（约 40MB）...';
-        } else {
-          loadingText.textContent = '正在处理抠图...';
-        }
-        progressFill.style.width = Math.round(progress * 100) + '%';
+      const dataURL = state.originalImage.toDataURL('image/png');
+
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 30000);
+      const resp = await fetch('/api/cutout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataURL }),
+        signal: ctrl.signal,
       });
-      state.cutoutImage = result;
-      state.hasCutout = true;
-      document.getElementById('infoCutout').textContent = '已抠图';
-      doAutoFit();
-    } catch (err) {
-      console.error('AI 抠图失败:', err);
-      manualSection.style.display = 'block';
-      if (err.message.includes('CDN') || err.message.includes('加载') || err.message.includes('网络')) {
-        alert('AI 抠图模型加载失败。已显示"手动抠图"备选方案。\n\n请点击"吸取背景色"按钮，然后在预览图中点击背景区域，再点击"执行手动抠图"。\n\n可能原因：网络环境限制，请尝试使用 VPN 或切换网络。\n\n错误：' + err.message);
-      } else {
-        alert('AI 抠图失败，已启用手动抠图备选方案。\n\n错误：' + err.message);
+      clearTimeout(tid);
+
+      const apiResult = await resp.json();
+      if (resp.ok && apiResult.data) {
+        const resultCanvas = await blobFromBase64(apiResult.data);
+        state.cutoutImage = resultCanvas;
+        state.hasCutout = true;
+        document.getElementById('infoCutout').textContent = '已抠图（百度AI）';
+        loadingOverlay.style.display = 'none';
+        doAutoFit();
+        return;
       }
-    } finally {
+      throw new Error(apiResult.error || '返回数据异常');
+    } catch (err) {
+      const msg = err.name === 'AbortError' ? '请求超时' : err.message;
       loadingOverlay.style.display = 'none';
+      alert('百度AI抠图失败：' + msg + '\n\n请确保服务器已启动（node server.js）');
     }
   }
 
-  // ===== 手动抠图（基于颜色） =====
-  function doManualCutout() {
-    if (!state.originalImage) return;
-    try {
-      const color = state.pickedColor;
-      const result = Utils.removeColorBackground(
-        state.originalImage,
-        color,
-        state.tolerance,
-        state.smoothness
-      );
-      state.cutoutImage = result;
-      state.hasCutout = true;
-      document.getElementById('infoCutout').textContent = '已抠图（手动）';
-      doAutoFit();
-    } catch (err) {
-      alert('手动抠图失败：' + err.message);
-    }
+  // 将 base64 字符串转为 canvas
+  async function blobFromBase64(base64Str) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const c = canvas.getContext('2d');
+        c.drawImage(img, 0, 0);
+        resolve(canvas);
+      };
+      img.onerror = () => reject(new Error('base64 图片加载失败'));
+      img.src = 'data:image/png;base64,' + base64Str;
+    });
   }
 
   // ===== 智能裁剪——以原图中心为优先，裁剪到目标尺寸比例 =====
@@ -530,11 +391,14 @@
     const size = getSizeById(state.sizeId);
     const targetRatio = size.width / size.height;
 
-    CropSelector.open(state.originalImage, targetRatio, (croppedCanvas) => {
+    CropSelector.open(state.originalImage, targetRatio, (croppedCanvas, cropRect) => {
       state.originalImage = croppedCanvas;
       if (state.cutoutImage) {
-        // 同步裁剪抠图结果（按相同比例）
-        state.cutoutImage = Utils.smartCropToRatio(state.cutoutImage, targetRatio);
+        const c = document.createElement('canvas');
+        c.width = cropRect.w;
+        c.height = cropRect.h;
+        c.getContext('2d').drawImage(state.cutoutImage, cropRect.x, cropRect.y, cropRect.w, cropRect.h, 0, 0, cropRect.w, cropRect.h);
+        state.cutoutImage = c;
       }
       state.offsetX = 0.5;
       state.offsetY = 0.4;
@@ -587,11 +451,6 @@
     const pxH = mmToPixel(size.height);
 
     let source = state.hasCutout ? state.cutoutImage : state.originalImage;
-
-    if (!state.hasCutout && state.originalImage) {
-      const tempCutout = tryAutoCutoutForRender();
-      if (tempCutout) source = tempCutout;
-    }
 
     if (state.rotation !== 0) {
       source = Utils.rotateCanvas(source, state.rotation);
