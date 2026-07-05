@@ -17,17 +17,23 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const HOST = '0.0.0.0';
 
-// 读取配置
+// 读取配置（优先环境变量，其次 config.json）
 let CONFIG = {
-  baiduApiKey: '',
-  baiduSecretKey: '',
-  maxImageSize: 1600
+  baiduApiKey: process.env.BAIDU_API_KEY || '',
+  baiduSecretKey: process.env.BAIDU_SECRET_KEY || '',
+  maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE, 10) || 1600
 };
 try {
   const configRaw = fs.readFileSync(path.join(ROOT, 'config.json'), 'utf-8');
-  CONFIG = JSON.parse(configRaw);
+  const fileConfig = JSON.parse(configRaw);
+  // 仅当环境变量未设置时，使用 config.json 中的值
+  if (!process.env.BAIDU_API_KEY && fileConfig.baiduApiKey) CONFIG.baiduApiKey = fileConfig.baiduApiKey;
+  if (!process.env.BAIDU_SECRET_KEY && fileConfig.baiduSecretKey) CONFIG.baiduSecretKey = fileConfig.baiduSecretKey;
+  if (fileConfig.maxImageSize) CONFIG.maxImageSize = fileConfig.maxImageSize;
 } catch (e) {
-  console.warn('无法读取 config.json:', e.message);
+  if (!CONFIG.baiduApiKey || !CONFIG.baiduSecretKey) {
+    console.warn('未找到 config.json，使用环境变量配置');
+  }
 }
 
 // ===== 百度 AI 抠图 API =====
@@ -56,7 +62,7 @@ const BaiduAI = {
   // 智能抠图
   async removeBackground(base64Data, onProgress) {
     if (!CONFIG.baiduApiKey || !CONFIG.baiduSecretKey) {
-      throw new Error('请在 config.json 中配置 baiduApiKey 和 baiduSecretKey');
+      throw new Error('请在环境变量 BAIDU_API_KEY / BAIDU_SECRET_KEY 或 config.json 中配置百度API密钥');
     }
 
     if (onProgress) onProgress(0.2);

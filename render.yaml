@@ -22,6 +22,14 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 18
+      # 百度 AI API 密钥（必填，用于抠图功能）
+      # 在 Render 控制台 → Environment 中设置实际值
+      - key: BAIDU_API_KEY
+        sync: false
+      - key: BAIDU_SECRET_KEY
+        sync: false
+      - key: MAX_IMAGE_SIZE
+        value: 1600
 
   # ========== Static Site（纯静态页面，无需服务器） ==========
   # 取消注释以下部分即可启用
